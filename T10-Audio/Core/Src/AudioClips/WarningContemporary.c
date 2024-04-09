@@ -5,7 +5,7 @@
  *      Author: chris
  */
 #include "WarningContemporary.h"
- const int16_t WarningContemporary[190080] = {
+const int16_t WarningContemporary[190080] = {
 	0x0000, 0x0000, 0x0000, 0x0000, 0x0100, 0xfeff, 0x0200, 0xfeff,
 	0x0100, 0x0000, 0x0100, 0xfdff, 0x0300, 0xfeff, 0x0100, 0x0000,
 	0xffff, 0x0100, 0x0000, 0x0000, 0x0000, 0x0000, 0xffff, 0x0200,
@@ -23768,4 +23768,4 @@
 	0x0100, 0xffff, 0xffff, 0x0200, 0xfeff, 0x0200, 0xfeff, 0x0100
 };
 
-const uint32_t sizeWarningContemporary = sizeof(WarningContemporary)*sizeof(int16_t);
+const uint32_t sizeWarningContemporary = sizeof(WarningContemporary)/sizeof(WarningContemporary[0]);

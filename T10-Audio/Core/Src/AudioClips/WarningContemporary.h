@@ -10,7 +10,7 @@
 
 #include "main.h"
 
-const int16_t 	WarningContemporary[];
-const uint32_t 	sizeWarningContemporary;
+extern const int16_t 	WarningContemporary[190080];
+extern const uint32_t 	sizeWarningContemporary;
 
 #endif /* SRC_AUDIOCLIPS_WARNINGCONTEMPORARY_H_ */

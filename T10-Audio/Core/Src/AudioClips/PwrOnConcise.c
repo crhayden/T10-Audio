@@ -7929,4 +7929,4 @@ const int16_t PwrOnConcise[63360] = {
 	0x0300, 0xfdff, 0x0200, 0xffff, 0xffff, 0x0300, 0xfdff, 0x0300,
 	0xfdff, 0x0100, 0x0100, 0xfeff, 0x0200, 0xffff, 0xffff, 0x0200
 };
-const uint32_t sizePwrOnConcise = sizeof(PwrOnConcise)*sizeof(int16_t);
+const uint32_t sizePwrOnConcise = sizeof(PwrOnConcise)/sizeof(PwrOnConcise[0]);

@@ -7352,5 +7352,5 @@
 	0x0000, 0x0000, 0x0000, 0xffff, 0x0100, 0xfeff, 0x0200, 0xffff,
 	0x0000, 0x0000, 0xffff, 0x0200, 0xfdff, 0x0400, 0xfbff, 0x0500
 };
-const uint32_t sizeNotificationSharp = sizeof(NotificationSharp)*sizeof(int16_t);
+const uint32_t sizeNotificationSharp = sizeof(NotificationSharp)/sizeof(NotificationSharp[0]);
 
