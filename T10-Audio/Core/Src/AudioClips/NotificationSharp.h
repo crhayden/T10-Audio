@@ -10,7 +10,7 @@
 
 #include "main.h"
 
-extern const int16_t	NotificationSharp[58752];
+extern const int16_t	NotificationSharp[];
 extern const uint32_t 	sizeNotificationSharp;
 
 #endif /* SRC_AUDIOCLIPS_NOTIFICATIONSHARP_H_ */
