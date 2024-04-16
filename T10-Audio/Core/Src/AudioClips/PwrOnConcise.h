@@ -10,6 +10,6 @@
 
 #include "main.h"
 
-extern const int16_t PwrOnConcise[63360];
+extern const int16_t PwrOnConcise[];
 extern const uint32_t sizePwrOnConcise;
 #endif /* SRC_AUDIOCLIPS_PWRONCONCISE_H_ */

@@ -26,10 +26,19 @@
 #include "AudioClips/WarningContemporary.h"
 #include "AudioClips/PwrOnConcise.h"
 #include "AudioClips/NotificationSharp.h"
+#include "AudioClips/AlarmNerdy.h"
+#include <stdio.h>
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef enum {
+  WARNING,
+  ALARM,
+  POWER_ON,
+  NOTIFICATION,
+} audio_clips_t;
 
 /* USER CODE END PTD */
 
@@ -40,14 +49,17 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
+#define MAX_DMA_VAL (uint32_t)(pow(2,16)-1)
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 I2S_HandleTypeDef hi2s3;
 DMA_HandleTypeDef hdma_spi3_tx;
 
-osThreadId defaultTaskHandle;
+osThreadId buttonTaskHandle;
+osThreadId audioTaskHandle;
+osMessageQId audioQueueHandle;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -57,14 +69,67 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_I2S3_Init(void);
-void StartDefaultTask(void const * argument);
+void ButtonTask(void const * argument);
+void AudioTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
-
+static  uint32_t _ReadPins();
+static  void     _Play(uint16_t* pBuf, uint32_t len);
+static  void     _PlayClip(audio_clips_t clip);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+static uint32_t _ReadPins() {
+  uint32_t  res =   0;
+  res       =   HAL_GPIO_ReadPin(GPIOE, SW5_Pin)  <<  2;
+  res       |=  HAL_GPIO_ReadPin(GPIOE, SW6_Pin)  <<  1;
+  res       |=  HAL_GPIO_ReadPin(GPIOA, Trigger_Pin);
+  return  res;
+}
+static void _Play(uint16_t* pBuf, uint32_t len) {
+  uint8_t   k = 0;
+  uint8_t   i = len/MAX_DMA_VAL;
+  //
+  // assume audio clip is larger than max size (2^16)
+  //
+  do {
+    //
+    // Advance to start of next chunk 
+    //
+    uint16_t* pData = &pBuf[k * MAX_DMA_VAL];
+    //
+    // Get the length of current chunk
+    //
+    uint32_t l        = len - MAX_DMA_VAL * k;
+    uint32_t clipSize = MIN(l, MAX_DMA_VAL);
+    //
+    // make sure we are ready before transmitting
+    //
+    while (HAL_I2S_GetState(&hi2s3) != HAL_I2S_STATE_READY);
+    HAL_I2S_Transmit_DMA(&hi2s3, (uint16_t*)pData, clipSize);
+    k++;
+  } while (i-->0);
+
+}
+static void _PlayClip(audio_clips_t clip) {
+    switch (clip) {
+        case WARNING:
+          _Play((uint16_t*)&WarningContemporary[0], sizeWarningContemporary);
+          break;
+        case ALARM:
+          _Play((uint16_t*)&AlarmNerdy[0], sizeAlarmNerdy);
+          break;
+        case POWER_ON:
+          _Play((uint16_t*)&PwrOnConcise[0], sizePwrOnConcise);
+          break;
+        case NOTIFICATION:
+          _Play((uint16_t*)&NotificationSharp[0], sizeNotificationSharp);
+          break;
+    default:
+      break;
+    }
+}
 
 /* USER CODE END 0 */
 
@@ -115,14 +180,23 @@ int main(void)
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
+  /* Create the queue(s) */
+  /* definition and creation of audioQueue */
+  osMessageQDef(audioQueue, 16, uint16_t);
+  audioQueueHandle = osMessageCreate(osMessageQ(audioQueue), NULL);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
-  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+  /* definition and creation of buttonTask */
+  osThreadDef(buttonTask, ButtonTask, osPriorityNormal, 0, 128);
+  buttonTaskHandle = osThreadCreate(osThread(buttonTask), NULL);
+
+  /* definition and creation of audioTask */
+  osThreadDef(audioTask, AudioTask, osPriorityIdle, 0, 128);
+  audioTaskHandle = osThreadCreate(osThread(audioTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -211,7 +285,7 @@ static void MX_I2S3_Init(void)
   /* USER CODE END I2S3_Init 1 */
   hi2s3.Instance = SPI3;
   hi2s3.Init.Mode = I2S_MODE_MASTER_TX;
-  hi2s3.Init.Standard = I2S_STANDARD_MSB;
+  hi2s3.Init.Standard = I2S_STANDARD_PHILIPS;
   hi2s3.Init.DataFormat = I2S_DATAFORMAT_16B_EXTENDED;
   hi2s3.Init.MCLKOutput = I2S_MCLKOUTPUT_DISABLE;
   hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_44K;
@@ -283,30 +357,77 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartDefaultTask */
+/* USER CODE BEGIN Header_ButtonTask */
 /**
-  * @brief  Function implementing the defaultTask thread.
+  * @brief  Function implementing the buttonTask thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void const * argument)
+/* USER CODE END Header_ButtonTask */
+void ButtonTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
-   //HAL_I2S_Transmit_DMA(&hi2s3, (uint16_t*)&WarningContemporary[0], sizeWarningContemporary);
-  //HAL_I2S_Transmit_DMA(&hi2s3, &PwrOnConcise[0], sizePwrOnConcise);
-  osDelay(1000);
-  HAL_I2S_Transmit_DMA(&hi2s3, (uint16_t*)&NotificationSharp[0], sizeNotificationSharp);
-  osDelay(1000);
-  for(;;)
-  {
-    osDelay(1);
+  uint32_t	curPinVal	=	 0;
+  uint32_t 	oldVal 		=  -1;
+  for(;;) {
+	curPinVal	=	_ReadPins();
+	//
+	// button release is required in between every playback iteration
+	//
+	if (curPinVal != oldVal) {
+		oldVal	=	curPinVal;
+		//
+		// Only attempt to play clip if there isn't one already playing
+		//
+		if (HAL_I2S_GetState(&hi2s3) == HAL_I2S_STATE_READY) {
+			switch (curPinVal) {
+  				case 3:
+  					osMessagePut (audioQueueHandle, WARNING, 100);
+  					break;
+  				case 5:
+  					osMessagePut (audioQueueHandle, NOTIFICATION, 100);
+  					break;
+  				case 6:
+  					osMessagePut (audioQueueHandle, ALARM, 100);
+  					break;
+  				default:
+  					break;
+			}
+		}
+	}
+  osDelay(50);
   }
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_AudioTask */
+/**
+* @brief Function implementing the audioTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_AudioTask */
+void AudioTask(void const * argument)
+{
+  /* USER CODE BEGIN AudioTask */
+  /* Infinite loop */
+  osEvent event;
+  audio_clips_t clip = 0;
+  _PlayClip(POWER_ON);
+  for(;;)
+  {
+	  event = osMessageGet(audioQueueHandle, osWaitForever);
+	  if (event.status == osEventMessage) {
+		  event.def.message_id  = audioQueueHandle;
+		  clip 					        = (audio_clips_t)event.value.v;
+      _PlayClip(clip);
+	  }
+	  osDelay(100);
+  }
+  /* USER CODE END AudioTask */
 }
 
 /**
